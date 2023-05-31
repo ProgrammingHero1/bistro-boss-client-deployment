@@ -5,7 +5,7 @@ import useAxiosSecure from "../../../hooks/useAxiosSecure";
 import useAuth from "../../../hooks/useAuth";
 
 
-const CheckoutForm = ({ price }) => {
+const CheckoutForm = ({ cart, price }) => {
     const stripe = useStripe();
     const elements = useElements();
     const { user } = useAuth();
@@ -16,13 +16,12 @@ const CheckoutForm = ({ price }) => {
     const [transactionId, setTransactionId] = useState('');
 
     useEffect(() => {
-        console.log(price)
         axiosSecure.post('/create-payment-intent', { price })
             .then(res => {
                 console.log(res.data.clientSecret)
                 setClientSecret(res.data.clientSecret);
             })
-    }, [])
+    }, [price, axiosSecure])
 
 
     const handleSubmit = async (event) => {
@@ -37,7 +36,7 @@ const CheckoutForm = ({ price }) => {
             return
         }
 
-        const { error, paymentMethod } = await stripe.createPaymentMethod({
+        const { error } = await stripe.createPaymentMethod({
             type: 'card',
             card
         })
@@ -74,7 +73,22 @@ const CheckoutForm = ({ price }) => {
         setProcessing(false)
         if(paymentIntent.status === 'succeeded'){
             setTransactionId(paymentIntent.id);
-            // TODO next steps
+            // save payment information to the server
+            const payment = {
+                email: user?.email, 
+                transactionId: paymentIntent.id, 
+                price,
+                quantity: cart.length,
+                items: cart.map(item => item._id),
+                itemNames: cart.map(item => item.name)
+            }
+            axiosSecure.post('/payments', payment)
+            .then(res =>{
+                console.log(res.data);
+                if(res.data.insertedId){
+                    // display confirm
+                }
+            })
         }
 
 
